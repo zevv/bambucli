@@ -6,6 +6,33 @@ var data: Table[string, string]
 var error_list: Table[string, string]
 
 
+proc get_stage_str(stage: int): string =
+  case stage
+    of 0: "Printing"
+    of 1: "Auto bed leveling"
+    of 2: "Heatbed preheating"
+    of 3: "Sweeping XY mech mode"
+    of 4: "Changing filament"
+    of 5: "M400 pause"
+    of 6: "Paused due to filament runout"
+    of 7: "Heating hotend"
+    of 8: "Calibrating extrusion"
+    of 9: "Scanning bed surface"
+    of 10: "Inspecting first layer"
+    of 11: "Identifying build plate type"
+    of 12: "Calibrating Micro Lidar"
+    of 13: "Homing toolhead"
+    of 14: "Cleaning nozzle tip"
+    of 15: "Checking extruder temperature"
+    of 16: "Printing was paused by the user"
+    of 17: "Pause of front cover falling"
+    of 18: "Calibrating the micro lida"
+    of 19: "Calibrating extrusion flow"
+    of 20: "Paused due to nozzle temperature malfunction"
+    of 21: "Paused due to heat bed temperature malfunction"
+    else: "?"
+
+
 proc decode(body: string) =
 
   #echo body
@@ -54,7 +81,7 @@ proc dump() =
   echo ""
   #echo "\e[2J\e[0H"
   p "task: {print.subtask_name}"
-  p "stage: {print.mc_print_stage}.{print.mc_print_sub_stage}"
+  p "stage: {print.stg_cur}.{print.mc_print_stage}.{print.mc_print_sub_stage} " & get_stage_str(data["print.stg_cur"].parseInt())
   p "progress: {print.mc_percent}%, layer {print.layer_num}/{print.total_layer_num}, -{print.mc_remaining_time} min"
   p "bed temp: {print.bed_temper}°C ({print.bed_target_temper}°C)"
   p "nozzle temp: {print.nozzle_temper}°C ({print.nozzle_target_temper}°C)"
