@@ -82,7 +82,7 @@ proc dump() =
   #echo "\e[2J\e[0H"
   p "task: {print.subtask_name}"
   p "stage: {print.stg_cur}.{print.mc_print_stage}.{print.mc_print_sub_stage} " & get_stage_str(data["print.stg_cur"].parseInt())
-  p "progress: {print.mc_percent}%, layer {print.layer_num}/{print.total_layer_num}, -{print.mc_remaining_time} min"
+  p "progress: {print.mc_percent}%, layer {print.layer_num}/{print.total_layer_num}, -{print.mc_remaining_time} min at {print.spd_mag}% speed"
   p "bed temp: {print.bed_temper}°C ({print.bed_target_temper}°C)"
   p "nozzle temp: {print.nozzle_temper}°C ({print.nozzle_target_temper}°C)"
   p "chamber temp: {print.chamber_temper}°C"
@@ -142,9 +142,17 @@ proc start() {.async.} =
   ctx.set_auth("bblp", pass)
   ctx.set_ping_interval(3)
 
+  var pushAll = false
+
   proc mqttSub() {.async.} =
     await ctx.start()
+
     proc on_data(topic: string, message: string) =
+      if not pushAll:
+        let device = topic.split("/")[1]
+        asyncCheck ctx.publish("device/" & device & "/request", """{"pushing":{"command":"pushall","push_target":1,"sequence_id":"20001","version":1}}""", 2)
+        pushAll = true
+
       decode(message)
       try:
         dump()
@@ -154,7 +162,6 @@ proc start() {.async.} =
     await ctx.subscribe("#", 2, on_data)
 
   await mqttSub()
-  await ctx.publish("device/00M09A330500140/request", """{"pushing":{"command":"pushall","push_target":1,"sequence_id":"20001","version":1}}""", 2)
 
   
   #asyncCheck ctx.publish("device/00M09A330500140/request", """{"pushing":{"command":"resume","sequence_id":"20001","version":1}}""", 2)
