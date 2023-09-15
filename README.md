@@ -1,22 +1,34 @@
 
-This is an experimental CLI interface to the Bambu printer family.
+![NPeg](/bambucli.png)
+
+This is an experimental CLI interface to the Bambu printer family. I
+exclusively use my printer in LAN only mode, and it makes me happy to see that
+Bambu chose to use standard open protocols for their interface.
+
 
 
 ## Building
 
-- nim c -d:ssl bambu.nim
+- `nimble install nmqtt`
+- `nim c -d:ssl bambu.nim`
 
 
 ## Usage
 
-- Create a file `~/.bambu` containing one line with the IP address of your printer and the password, separated by a `:`
-- run `./bambu`
+Create a file `~/.bambu` containing one line with the IP address of your printer and the password, separated by a `:`, mine looks
+like this:
+
+```
+10.0.0.30:734f29a1
+```
+ 
+run `./bambu`
 
 
 ## TODO
 
 - basic control (pause, resume, etc)
-- get and implement a complete list of error codes
+- uPnP device discovery
 
 
 Example JSON dump:
@@ -207,7 +219,7 @@ Example JSON dump:
     ],
     "stg_cur": 0,
     "subtask_id": "0",
-    "subtask_name": "shimano-nowos.002_plate_1",
+    "subtask_name": "shimano-002_plate_1",
     "task_id": "2247",
     "total_layer_num": 58,
     "upgrade_state": {
