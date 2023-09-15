@@ -1,6 +1,8 @@
 
 
-import nmqtt, asyncdispatch, json, tables, strutils, os, strformat, httpclient, std/wordwrap
+import nmqtt, asyncdispatch, json, tables, strutils, os, strformat, httpclient, std/wordwrap, net, asyncnet
+
+import discover
 
 var data: Table[string, string]
 var error_list: Table[string, string]
@@ -88,7 +90,7 @@ proc dump() =
   p "chamber temp: {print.chamber_temper}°C"
   p "fans: part: {print.cooling_fan_speed}, aux: {print.big_fan1_speed}, chamber: {print.big_fan2_speed}"
   p "AMS humidity: {print.ams.ams[0].humidity}"
-  var filament = ""
+  p "filament: "
   for i in 0..3:
     let key = "print.ams.ams[0].tray[" & $i & "].tray_color"
     if key in data:
@@ -99,8 +101,7 @@ proc dump() =
       let r = c[0..1].parseHexInt()
       let g = c[2..3].parseHexInt()
       let b = c[4..5].parseHexInt()
-      filament &= $i & ": " & t & " " & &"\x1b[48;2;{r};{g};{b}m   \e[0m "
-  echo "filament: " & filament
+      echo $i & ": " & &"\x1b[48;2;{r};{g};{b}m   \e[0m " & t
 
   if data["print.fail_reason"] != "0":
     p "fail reason: {print.fail_reason}"
@@ -125,9 +126,13 @@ proc get_ecodes() {.async.} =
     let intro = item["intro"].getStr()
     error_list[ecode] = intro
 
- 
+
+
+
   
 proc start() {.async.} =
+
+  #await discover()
 
   # Get error code list from bambu
   await get_ecodes()
