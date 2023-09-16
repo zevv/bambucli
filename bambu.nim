@@ -61,6 +61,18 @@ proc dump(b: Bambu) {.async.} =
       else:
         s = s[0..f1-1] & "-" & s[f2+1..s.len-1]
     echo s
+    
+  proc dump_filament(label: string, prefix: string) =
+    let key = prefix & ".tray_color"
+    if key in b.data:
+      let c = b.data[prefix & ".tray_color"]
+      var t = b.data[prefix & ".tray_sub_brands"]
+      if t == "":
+        t = b.data[prefix & ".tray_type"]
+      let r = c[0..1].parseHexInt()
+      let g = c[2..3].parseHexInt()
+      let b = c[4..5].parseHexInt()
+      echo " " & label & ": " & &"\x1b[48;2;{r};{g};{b}m   \e[0m " & t
 
   try:
     echo ""
@@ -74,17 +86,11 @@ proc dump(b: Bambu) {.async.} =
     p "fans: part: {print.cooling_fan_speed}, aux: {print.big_fan1_speed}, chamber: {print.big_fan2_speed}"
     p "AMS humidity: {print.ams.ams[0].humidity}"
     p "filament: "
+
+
+    dump_filament("ext", "print.vt_tray")
     for i in 0..3:
-      let key = "print.ams.ams[0].tray[" & $i & "].tray_color"
-      if key in b.data:
-        let c = b.data["print.ams.ams[0].tray[" & $i & "].tray_color"]
-        var t = b.data["print.ams.ams[0].tray[" & $i & "].tray_sub_brands"]
-        if t == "":
-          t = b.data["print.ams.ams[0].tray[" & $i & "].tray_type"]
-        let r = c[0..1].parseHexInt()
-        let g = c[2..3].parseHexInt()
-        let b = c[4..5].parseHexInt()
-        echo $i & ": " & &"\x1b[48;2;{r};{g};{b}m   \e[0m " & t
+      dump_filament("A" & $i & " ", "print.ams.ams[0].tray[" & $i & "]")
 
     if b.data["print.fail_reason"] != "0":
       p "fail reason: {print.fail_reason}"
@@ -140,7 +146,7 @@ proc resume*(b: Bambu) {.async.} =
 proc discover*(b: Bambu) {.async.} =
   let res = await discover()
   echo "Discovered " & res.device & " at " & res.ip
-  b.start(res.device, res.ip)
+  await b.start(res.device, res.ip)
 
 
 proc newBambu*(): Bambu =

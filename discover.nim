@@ -11,8 +11,10 @@ type
     device*: string
     ip*: string
 
-proc set_mcast(fd: cint, address: cstring, port: cint) {.importc.}
 
+# Pretty crappy that Nim's stdlib does not come with multicast support
+
+proc set_mcast(fd: cint, address: cstring) {.importc.}
 
 {.emit:"""
 #ifdef WIN32
@@ -25,12 +27,19 @@ proc set_mcast(fd: cint, address: cstring, port: cint) {.importc.}
 #include <sys/socket.h>
 #endif
 
-// Pretty crappy that Nim does not come with multicast support
-void set_mcast(int fd, char *addr, int port)
+void set_mcast(int fd, char *addr)
 {
-    setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &(int){1}, sizeof(int));
-    setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &(struct ip_mreq){.imr_multiaddr.s_addr = inet_addr(addr), .imr_interface.s_addr = INADDR_ANY}, sizeof(struct ip_mreq));
-    setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, &(int){4}, sizeof(int));
+    struct ip_mreq mreq;
+    memset(&mreq, 0, sizeof(mreq));
+    mreq.imr_multiaddr.s_addr = inet_addr(addr);
+    mreq.imr_interface.s_addr = INADDR_ANY;
+    setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
+
+    int yes = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&yes, sizeof(yes));
+    
+    int ttl = 4;
+    setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, (char *)&ttl, sizeof(ttl));
 }
 """.}
   
@@ -51,7 +60,7 @@ proc discover*(): Future[DiscoverResult] {.async.} =
     "\r\n"
 
   let sock = newAsyncSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, false)
-  set_mcast(sock.getFd().cint, address.cstring, port.cint)
+  set_mcast(sock.getFd().cint, address.cstring)
   await sock.sendTo(address, Port(port), q)
   let rsp = await sock.recv(1500)
 
