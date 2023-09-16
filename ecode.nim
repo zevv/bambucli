@@ -5,8 +5,6 @@ import std/tables
 import std/httpclient
 import std/strutils
 
-#strutils, os, strformat, httpclient, std/wordwrap, net, asyncnet
-
 var error_list: Table[string, string]
 
 proc download_ecodes*() {.async.} = 
@@ -18,6 +16,9 @@ proc download_ecodes*() {.async.} =
     let intro = item["intro"].getStr()
     error_list[ecode] = intro
 
+
+# Convert the given error code to a string, using the online database if
+# necessary
 
 proc ecode_str*(ecode: int): Future[string] {.async.} =
   if error_list.len == 0:

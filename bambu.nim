@@ -15,10 +15,11 @@ type
     data: Table[string, string]
 
 
+
 proc decode(b: Bambu, body: string) =
 
-  #echo body
-
+  # Recursively unpack the JSON HMS data into 
+  # a string/string table with dotted keys
   proc aux(j: JsonNode, prefix="") =
     case j.kind
       of JInt, JFloat, JBool:
@@ -38,7 +39,8 @@ proc decode(b: Bambu, body: string) =
 
   aux(parseJSon(body))
 
-  let f = open("/tmp/bambu.json", fmWrite)
+  # For debugging purpuses, dump the current data to file
+  let f = open("/tmp/bambu.data", fmWrite)
   for k, v in b.data:
     f.writeLine($k & ": " & $v)
   f.close()
@@ -99,13 +101,13 @@ proc dump(b: Bambu) {.async.} =
     discard
  
 
-
-
-proc call(b: Bambu, meth: string, msg: string) {.async.} =
+proc pub(b: Bambu, meth: string, msg: string) {.async.} =
   let topic = "device/" & b.device & "/" & meth
   await b.ctx.publish(topic, msg, 2)
 
 
+proc command(b: Bambu, command: string) {.async.} =
+  await b.pub("request", """{"pushing":{"command":"","sequence_id":"20001","version":1}}""")
 
 
 proc start*(b: Bambu, device: string, ip: string) {.async.} =
@@ -127,12 +129,12 @@ proc start*(b: Bambu, device: string, ip: string) {.async.} =
     b.decode(message)
     asyncCheck b.dump()
 
-  await b.ctx.subscribe("#", 2, on_data)
-  await b.call("request", """{"pushing":{"command":"pushall","push_target":1,"sequence_id":"20001","version":1}}""")
+  await b.ctx.subscribe("device/" & b.device & "/#", 2, on_data)
+  await b.pub("request", """{"pushing":{"command":"pushall","push_target":1,"sequence_id":"20001","version":1}}""")
 
 
 proc resume*(b: Bambu) {.async.} =
-  await b.call("request", """{"pushing":{"command":"resume","sequence_id":"20001","version":1}}""")
+  await b.pub("request", """{"pushing":{"command":"resume","sequence_id":"20001","version":1}}""")
 
 
 proc discover*(b: Bambu) {.async.} =

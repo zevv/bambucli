@@ -3,12 +3,11 @@ import std/asyncdispatch
 
 import bambu
 
-proc start() {.async.} =
-
+proc run() {.async.} =
   let b = newBambu()
   await b.discover()
 
   
-asyncCheck start()
+asyncCheck run()
 runForever()
 
