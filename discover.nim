@@ -8,22 +8,29 @@ import std/tables
 
 type
   DiscoverResult* = object
-    usn*: string
-    location*: string
+    device*: string
+    ip*: string
 
 proc set_mcast(fd: cint, address: cstring, port: cint) {.importc.}
 
 
 {.emit:"""
+#ifdef WIN32
+#include <winsock2.h>
+#include <windows.h>
+#include <ws2tcpip.h>
+#include <mswsock.h>
+#else
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#endif
 
 // Pretty crappy that Nim does not come with multicast support
 void set_mcast(int fd, char *addr, int port)
 {
     setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &(int){1}, sizeof(int));
-    setsockopt(fd, SOL_IP, IP_ADD_MEMBERSHIP, &(struct ip_mreq){.imr_multiaddr.s_addr = inet_addr(addr), .imr_interface.s_addr = INADDR_ANY}, sizeof(struct ip_mreq));
-    setsockopt(fd, SOL_IP, IP_MULTICAST_TTL, &(int){4}, sizeof(int));
+    setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &(struct ip_mreq){.imr_multiaddr.s_addr = inet_addr(addr), .imr_interface.s_addr = INADDR_ANY}, sizeof(struct ip_mreq));
+    setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, &(int){4}, sizeof(int));
 }
 """.}
   
@@ -55,6 +62,6 @@ proc discover*(): Future[DiscoverResult] {.async.} =
     if parts.len == 2:
       headers[parts[0].strip().toLowerAscii] = parts[1].strip()
 
-  DiscoverResult(usn: headers["usn"], location: headers["location"])
+  DiscoverResult(device: headers["usn"], ip: headers["location"])
 
 

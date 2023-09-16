@@ -10,7 +10,7 @@ Bambu chose to use standard open protocols for their interface.
 ## Building
 
 - `nimble install nmqtt`
-- `nim c -d:ssl bambu.nim`
+- `nim c -d:ssl bambucli.nim`
 
 
 ## Usage
@@ -22,7 +22,7 @@ like this:
 10.0.0.30:734f29a1
 ```
  
-run `./bambu`
+run `./bambucli`
 
 
 ## TODO
