@@ -1,6 +1,6 @@
 
 
-import nmqtt, asyncdispatch, json, tables, strutils, os, strformat, httpclient, std/wordwrap, net, asyncnet
+import nmqtt, asyncdispatch, json, tables, strutils, os, strformat, httpclient, std/wordwrap, net, asyncnet, terminal, colors
 
 import discover
 import ecode
@@ -8,104 +8,148 @@ import stage
 
 
 type
+
+  Temperature = float
+
   Bambu = ref object
     ctx: MqttCtx
     device: string
     ip: string
     data: Table[string, string]
 
+    progress: int
+
+    layer_num: int
+    layer_cur: int
+
+    task: string
+    stage: int
+
+    bed_temp, bed_target_temp: Temperature
+    nozzle_temp, nozzle_target_temp: Temperature
+    chamber_temp: Temperature
+    fan_part: int
+    fan_aux: int
+    fan_chamber: int
+
+    filExt: Filament
+    FilAms: array[16, Filament]
+
+  Filament = object
+    color: string
+    brand: string
+    typ: string
+
 
 
 proc decode(b: Bambu, body: string) =
 
-  # Recursively unpack the JSON HMS data into 
-  # a string/string table with dotted keys
-  proc aux(j: JsonNode, prefix="") =
-    case j.kind
-      of JInt, JFloat, JBool:
-        b.data[prefix] = $j
-      of JString:
-        b.data[prefix] = j.getStr
-      of JObject:
-        for k, jc in j:
-          aux(jc, if prefix == "": $k else: prefix & "." & $k)
-      of JArray:
-        var n = 0
-        for jc in j:
-          aux(jc, prefix & "[" & $n & "]")
-          inc n
-      of JNull:
-        discard
+  let j = parseJSon(body)
 
-  aux(parseJSon(body))
+  #echo j.pretty
+ 
+  eraseScreen()
+  setCursorPos(0, 0)
 
-  # For debugging purpuses, dump the current data to file
-  let f = open("/tmp/bambu.data", fmWrite)
-  for k, v in b.data:
-    f.writeLine($k & ": " & $v)
-  f.close()
+  proc get(key: string): JsonNode =
+    var j = j
+    for k in split(key, "."):
+      case j.kind:
+        of JObject:
+          j = j[k]
+        of JArray:
+          j = j[k.parseInt()]
+        else:
+          discard
+    return j
+  
+  proc getInt(val: var int, key: string, scale=1.0) =
+    try:
+      let j = get(key)
+      val = if j.kind == JString: j.getStr().parseInt() else: j.getInt()
+      val = (val.float * scale).int
+    except:
+      discard
 
+  proc getFloat(val: var float, key: string, scale=1.0) =
+    try:
+      val = get(key).getFloat() * scale
+    except:
+      discard
+  
+  proc getString(val: var string, key: string) =
+    try:
+      val = get(key).getStr()
+    except:
+      discard
+
+  proc getFilament(f: var Filament, prefix: string) =
+    getString(f.color, prefix & ".tray_color")
+    getString(f.brand, prefix & ".tray_sub_brands")
+    getString(f.typ, prefix & ".tray_type")
+
+  getString(b.task, "print.subtask_name")
+  getInt(b.stage, "print.stg_cur")
+  getInt(b.progress, "print.mc_percent")
+  getInt(b.layer_num, "print.total_layer_num")
+  getInt(b.layer_cur, "print.layer_num")
+  getFloat(b.bed_temp, "print.bed_temper")
+  getFloat(b.bed_target_temp, "print.bed_target_temper")
+  getFloat(b.nozzle_temp, "print.nozzle_temper")
+  getFloat(b.nozzle_target_temp, "print.nozzle_target_temper")
+  getFloat(b.chamber_temp, "print.chamber_temper")
+  getInt(b.fan_part, "print.cooling_fan_speed", 100/15.0)
+  getInt(b.fan_aux, "print.big_fan1_speed", 100/15.0)
+  getInt(b.fan_chamber, "print.big_fan2_speed", 100/15.0)
+  getFilament(b.filExt, "print.vt_tray")
+  getFilament(b.FilAms[0], "print.ams.ams.0.tray.0")
+  getFilament(b.FilAms[1], "print.ams.ams.0.tray.1")
+  getFilament(b.FilAms[2], "print.ams.ams.0.tray.2")
+  getFilament(b.FilAms[3], "print.ams.ams.0.tray.3")
+
+
+
+
+proc dump_filament(b: Bambu, label: string, f: Filament) =
+  if f.typ != "":
+    stdout.write "  " & label & ": "
+    let c = f.color
+    if c.len > 0:
+      let color = rgb(c[0..1].parseHexInt(), c[2..3].parseHexInt(), c[4..5].parseHexInt())
+      stdout.setBackgroundColor(color)
+      stdout.write "   "
+      stdout.resetAttributes()
+      stdout.write(" ")
+    stdout.styledWriteLine styleBright, f.typ & " " & f.brand
 
 
 proc dump(b: Bambu) {.async.} =
-  proc p(s: string) =
-    var s = s
-    while true:
-      let f1 = s.find("{")
-      let f2 = s.find("}")
-      if f1 == -1 or f2 == -1:
-        break
-      let key = s[f1+1..f2-1]
-      if key in b.data:
-        s = s[0..f1-1] & "\e[1m" & b.data[key] & "\e[0m" & s[f2+1..s.len-1]
-      else:
-        s = s[0..f1-1] & "-" & s[f2+1..s.len-1]
-    echo s
-    
-  proc dump_filament(label: string, prefix: string) =
-    let key = prefix & ".tray_color"
-    if key in b.data:
-      let c = b.data[prefix & ".tray_color"]
-      var t = b.data[prefix & ".tray_sub_brands"]
-      if t == "":
-        t = b.data[prefix & ".tray_type"]
-      let r = c[0..1].parseHexInt()
-      let g = c[2..3].parseHexInt()
-      let b = c[4..5].parseHexInt()
-      echo " " & label & ": " & &"\x1b[48;2;{r};{g};{b}m   \e[0m " & t
 
-  try:
-    echo ""
-    #echo "\e[2J\e[0H"
-    p "task: {print.subtask_name}"
-    p "stage: {print.stg_cur}.{print.mc_print_stage}.{print.mc_print_sub_stage} " & stage_str(b.data["print.stg_cur"].parseInt())
-    p "progress: {print.mc_percent}%, layer {print.layer_num}/{print.total_layer_num}, -{print.mc_remaining_time} min at {print.spd_mag}% speed"
-    p "bed temp: {print.bed_temper}°C ({print.bed_target_temper}°C)"
-    p "nozzle temp: {print.nozzle_temper}°C ({print.nozzle_target_temper}°C)"
-    p "chamber temp: {print.chamber_temper}°C"
-    p "fans: part: {print.cooling_fan_speed}, aux: {print.big_fan1_speed}, chamber: {print.big_fan2_speed}"
-    p "AMS humidity: {print.ams.ams[0].humidity}"
-    p "filament: "
+  enableTrueColors()
+
+  stdout.styledWriteLine "task: ", styleBright, b.task
+  stdout.styledWriteLine "stage: ", styleBright, stage_str(b.stage) & " (" & $b.stage & ")"
+  if b.progress > 0:
+    stdout.styledWriteLine "progress: ", styleBright, $b.progress & "%, layer " & $b.layer_cur & "/" & $b.layer_num
+
+  stdout.styledWriteLine "Temperatures:"
+  stdout.styledWriteLine "  bed:     ", styleBright, $b.bed_temp & "°C (" & $b.bed_target_temp & "°C)"
+  stdout.styledWriteLine "  nozzle:  ", styleBright, $b.nozzle_temp & "°C (" & $b.nozzle_target_temp & "°C)"
+  stdout.styledWriteLine "  chamber: ", styleBright, $b.chamber_temp & "°C"
+
+  stdout.styledWriteLine "Fans:"
+  stdout.styledWriteLine "  part:    ", styleBright, $b.fan_part & "%"
+  stdout.styledWriteLine "  aux:     ", styleBright, $b.fan_aux & "%"
+  stdout.styledWriteLine "  chamber: ", styleBright, $b.fan_chamber & "%"
+
+  stdout.styledWriteLine "Filament:"
+  b.dump_filament("ext", b.filExt)
+  for ams in 0..3:
+    for spool in 0..3:
+      b.dump_filament($(ams+1) & "." & $(spool+1), b.FilAms[ams * 4 + spool])
 
 
-    dump_filament("ext", "print.vt_tray")
-    for i in 0..3:
-      dump_filament("A" & $i & " ", "print.ams.ams[0].tray[" & $i & "]")
 
-    if b.data["print.fail_reason"] != "0":
-      p "fail reason: {print.fail_reason}"
-
-    if b.data["print.print_error"] != "0" or b.data["print.mc_print_error_code"] != "0":
-      p "error: {print.print_error} {print.mc_print_error_code}"
-      # convert to hex string
-      let ecode = b.data["print.print_error"].parseInt()
-      let msg = await ecode_str(ecode)
-      echo "--------------------"
-      echo "\e[1;31mError: " & msg.wrapWords(80) & "\e[0m"
-      echo "--------------------"
-  except:
-    discard
- 
 
 proc pub(b: Bambu, meth: string, msg: string) {.async.} =
   let topic = "device/" & b.device & "/" & meth
