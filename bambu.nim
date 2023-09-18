@@ -32,6 +32,7 @@ type
     data: Table[string, string]
 
     progress: int
+    eta: int
 
     layer_num: int
     layer_cur: int
@@ -100,6 +101,7 @@ proc decode(b: Bambu, body: string) =
   getString(b.task, "print.subtask_name")
   getInt(b.stage, "print.stg_cur")
   getInt(b.progress, "print.mc_percent")
+  getInt(b.eta, "print.mc_remaining_time")
   getInt(b.layer_num, "print.total_layer_num")
   getInt(b.layer_cur, "print.layer_num")
   getFloat(b.bed_temp, "print.bed_temper")
@@ -146,7 +148,7 @@ proc dump(b: Bambu) {.async.} =
   stdout.styledWriteLine "task: ", styleBright, b.task
   stdout.styledWriteLine "stage: ", styleBright, stage_str(b.stage) & " (" & $b.stage & ")"
   if b.progress > 0:
-    stdout.styledWriteLine "progress: ", styleBright, $b.progress & "%, layer " & $b.layer_cur & "/" & $b.layer_num
+    stdout.styledWriteLine "progress: ", styleBright, $b.progress & "%, layer " & $b.layer_cur & "/" & $b.layer_num & ", eta " & $b.eta & "m"
 
   stdout.styledWriteLine "Temperatures:"
   stdout.styledWriteLine "  bed:     ", styleBright, $b.bed_temp & "°C (" & $b.bed_target_temp & "°C)"
