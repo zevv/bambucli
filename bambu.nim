@@ -1,10 +1,24 @@
 
 
-import nmqtt, asyncdispatch, json, tables, strutils, os, strformat, httpclient, std/wordwrap, net, asyncnet, terminal, colors
+import std/asyncdispatch
+import std/json
+import std/tables
+import std/strutils
+import std/os
+import std/strformat
+import std/httpclient
+import std/wordwrap
+import std/net
+import std/asyncnet
+import std/terminal
+import std/colors
+
+import nmqtt
 
 import discover
 import ecode
 import stage
+import filament
 
 
 type
@@ -83,11 +97,6 @@ proc decode(b: Bambu, body: string) =
     except:
       discard
 
-  proc getFilament(f: var Filament, prefix: string) =
-    getString(f.color, prefix & ".tray_color")
-    getString(f.brand, prefix & ".tray_sub_brands")
-    getString(f.typ, prefix & ".tray_type")
-
   getString(b.task, "print.subtask_name")
   getInt(b.stage, "print.stg_cur")
   getInt(b.progress, "print.mc_percent")
@@ -101,6 +110,12 @@ proc decode(b: Bambu, body: string) =
   getInt(b.fan_part, "print.cooling_fan_speed", 100/15.0)
   getInt(b.fan_aux, "print.big_fan1_speed", 100/15.0)
   getInt(b.fan_chamber, "print.big_fan2_speed", 100/15.0)
+
+  proc getFilament(f: var Filament, prefix: string) =
+    getString(f.color, prefix & ".tray_color")
+    getString(f.brand, prefix & ".tray_sub_brands")
+    getString(f.typ, prefix & ".tray_type")
+
   getFilament(b.filExt, "print.vt_tray")
   getFilament(b.FilAms[0], "print.ams.ams.0.tray.0")
   getFilament(b.FilAms[1], "print.ams.ams.0.tray.1")

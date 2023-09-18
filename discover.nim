@@ -71,6 +71,6 @@ proc discover*(): Future[DiscoverResult] {.async.} =
     if parts.len == 2:
       headers[parts[0].strip().toLowerAscii] = parts[1].strip()
 
-  DiscoverResult(device: headers["usn"], ip: headers["location"])
+  return DiscoverResult(device: headers["usn"], ip: headers["location"])
 
 
