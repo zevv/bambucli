@@ -135,7 +135,8 @@ proc dump_filament(b: Bambu, label: string, f: Filament) =
       stdout.write "   "
       stdout.resetAttributes()
       stdout.write(" ")
-    stdout.styledWriteLine styleBright, f.typ & " " & f.brand
+    stdout.write filament_color_name(f.brand, c) & " "
+    stdout.styledWriteLine styleBright, f.typ & " " & f.brand & " "
 
 
 proc dump(b: Bambu) {.async.} =
