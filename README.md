@@ -24,6 +24,11 @@ like this:
  
 run `./bambucli`
 
+Note: for true color display on linux, you might need to set the `COLORTERM` environment variable:
+
+```
+export COLORTERM=truecolro
+```
 
 ## TODO
 
